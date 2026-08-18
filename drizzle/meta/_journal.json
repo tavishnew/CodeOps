@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786829512021,
+      "tag": "0000_broad_blob",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786830196725,
+      "tag": "0001_amusing_synch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786831295372,
+      "tag": "0002_gigantic_squadron_supreme",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1786916054588,
+      "tag": "0003_optimal_solo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1786994122155,
+      "tag": "0004_sloppy_post",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786994234907,
+      "tag": "0005_new_the_fury",
+      "breakpoints": true
+    }
+  ]
+}
