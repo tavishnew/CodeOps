@@ -1,10 +1,30 @@
+import "dotenv/config";
+
+function list(value?: string): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Environment configuration for standalone deployments (Render, Vercel, bare Node).
+ * Better Auth is the single auth system; no Manus platform variables are read anywhere.
+ */
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  nodeEnv: process.env.NODE_ENV ?? "development",
   databaseUrl: process.env.DATABASE_URL ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  auth: {
+    secret: process.env.BETTER_AUTH_SECRET ?? "",
+    url: process.env.BETTER_AUTH_URL || `http://localhost:${process.env.PORT || "3000"}`,
+    trustedOrigins: list(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+  },
+  github: {
+    clientId: process.env.GITHUB_CLIENT_ID ?? "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+  },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  },
 };
