@@ -34,9 +34,14 @@ vi.mock("./db", () => ({
   getIncident: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, key: "INC-042", status: "investigating" })),
   getAutomation: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, name: "PR risk review", enabled: 0 })),
   getKnowledgeItem: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, label: "Repository files", type: "repository" })),
+  listInsights: vi.fn(async () => [{ id: 1, title: "Elevated deployment risk", severity: "high" }]),
+  getInsight: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, title: "Elevated deployment risk", severity: "high" })),
+  createInsight: vi.fn(async (userId: number, input: { title: string }) => ({ id: 11, workspaceId: userId, title: input.title })),
+  updateInsight: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, title: "Elevated deployment risk updated" })),
+  deleteInsight: vi.fn(async () => ({ success: true })),
 }));
 
-const user = { id: 42, openId: "contract-user", email: "contract@example.com", name: "Contract User", loginMethod: "manus", role: "user" as const, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
+const user = { id: 42, openId: "contract-user", email: "contract@example.com", name: "Contract User", loginMethod: "better-auth", role: "user" as const, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
 function context(): TrpcContext { return { user, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
 
 describe("authenticated repository contract", () => {

@@ -166,6 +166,18 @@ export const knowledgeItems = mysqlTable("knowledge_items", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const insights = mysqlTable("insights", {
+  id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(),
+  projectId: int("projectId"),
+  title: varchar("title", { length: 240 }).notNull(),
+  description: text("description"),
+  severity: mysqlEnum("severity", ["low", "medium", "high"]).default("medium").notNull(),
+  confidence: varchar("confidence", { length: 40 }),
+  sourceRef: varchar("sourceRef", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Workspace = typeof workspaces.$inferSelect;
@@ -179,3 +191,5 @@ export type Incident = typeof incidents.$inferSelect;
 export type Automation = typeof automations.$inferSelect;
 export type AutomationRun = typeof automationRuns.$inferSelect;
 export type KnowledgeItem = typeof knowledgeItems.$inferSelect;
+export type Insight = typeof insights.$inferSelect;
+export type InsertInsight = typeof insights.$inferInsert;

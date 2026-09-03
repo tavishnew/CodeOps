@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { automations, deployments, incidents, issues, knowledgeItems, projects, pullRequests, workspaces } from "../drizzle/schema";
+import { automations, deployments, incidents, insights, issues, knowledgeItems, projects, pullRequests, workspaces } from "../drizzle/schema";
 import type { getDb } from "./db";
 
 export const PROJECT_SEEDS = [
@@ -43,6 +43,11 @@ export async function seedWorkspace(db: Awaited<ReturnType<typeof getDb>>, works
     { workspaceId, projectId: projectIds.Axiom, type: "runbook", label: "Runbooks", sourceRef: "runbook://api-errors", content: "API error response and rollback guidance." },
     { workspaceId, projectId: projectIds.Axiom, type: "incident", label: "Incident precedent", sourceRef: "incident://INC-042", content: "Prior auth middleware signal." },
   ]);
+  await db.insert(insights).values([
+    { workspaceId, projectId: projectIds.Axiom, title: "Elevated deployment risk", description: "High-risk auth change follows three related issues.", severity: "high", confidence: "0.82 preview", sourceRef: "PR #142" },
+    { workspaceId, projectId: projectIds.AutoQA, title: "Regression pattern detected", description: "Test flake clusters around request retries.", severity: "medium", confidence: "0.71 preview", sourceRef: "last 24h" },
+    { workspaceId, projectId: projectIds.SignalDock, title: "Knowledge context ready", description: "Runbook and incident precedent are indexed.", severity: "low", confidence: "0.89 preview", sourceRef: "8 sources" },
+  ]);
 }
 
 export async function getOrCreateWorkspace(db: Awaited<ReturnType<typeof getDb>>, userId: number, ownerName?: string | null) {
@@ -55,5 +60,7 @@ export async function getOrCreateWorkspace(db: Awaited<ReturnType<typeof getDb>>
   await db.insert(workspaces).values({ ownerId: userId, slug, name: ownerName ? `${ownerName}'s engineering` : "Engineering workspace", mode: "connected" });
   const [created] = await db.select().from(workspaces).where(eq(workspaces.ownerId, userId)).limit(1);
   if (!created) throw new Error("Workspace could not be created");
+  const freshWorkspace = created;
+  await seedWorkspace(db, freshWorkspace.id);
   return created;
 }

@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, automations, automationRuns, deployments, incidents, issues, knowledgeItems, projects, pullRequests, users, workspaces } from "../drizzle/schema";
+import { InsertUser, automations, automationRuns, deployments, incidents, insights, issues, knowledgeItems, projects, pullRequests, users, workspaces } from "../drizzle/schema";
 import { listDemoRepositories, demoSyncSummary, selectDemoRepositories } from "./githubDemo";
 import { ENV } from "./_core/env";
 import { getOrCreateWorkspace } from "./seed";
@@ -8,8 +8,8 @@ import { getOrCreateWorkspace } from "./seed";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); }
+  if (!_db && ENV.databaseUrl) {
+    try { _db = drizzle(ENV.databaseUrl); }
     catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
   }
   return _db;
@@ -22,7 +22,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const values: InsertUser = { openId: user.openId, name: user.name ?? null, email: user.email ?? null, loginMethod: user.loginMethod ?? null, lastSignedIn: user.lastSignedIn ?? new Date() };
   const updateSet: Record<string, unknown> = { name: values.name, email: values.email, loginMethod: values.loginMethod, lastSignedIn: values.lastSignedIn };
   if (user.role) { values.role = user.role; updateSet.role = user.role; }
-  else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
@@ -134,6 +133,39 @@ export async function getDeployment(userId: number, id: number) { return getWork
 export async function getIncident(userId: number, id: number) { return getWorkspaceEntity(userId, id, incidents); }
 export async function getAutomation(userId: number, id: number) { return getWorkspaceEntity(userId, id, automations); }
 export async function getKnowledgeItem(userId: number, id: number) { return getWorkspaceEntity(userId, id, knowledgeItems); }
+
+export async function listInsights(userId: number) {
+  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
+  const workspace = await getOrCreateWorkspace(db, userId);
+  return db.select().from(insights).where(eq(insights.workspaceId, workspace.id)).orderBy(desc(insights.createdAt));
+}
+export async function getInsight(userId: number, id: number) { return getWorkspaceEntity(userId, id, insights); }
+export async function createInsight(userId: number, input: { projectId?: number | null; title: string; description?: string; severity?: "low" | "medium" | "high"; confidence?: string; sourceRef?: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
+  const workspace = await getOrCreateWorkspace(db, userId);
+  const values = { workspaceId: workspace.id, projectId: input.projectId ?? null, title: input.title, description: input.description ?? null, severity: input.severity ?? "medium", confidence: input.confidence ?? null, sourceRef: input.sourceRef ?? null };
+  const [result] = await db.insert(insights).values(values);
+  return (await db.select().from(insights).where(eq(insights.id, result.insertId)).limit(1))[0];
+}
+export async function updateInsight(userId: number, id: number, input: { projectId?: number | null; title?: string; description?: string | null; severity?: "low" | "medium" | "high"; confidence?: string | null; sourceRef?: string | null }) {
+  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
+  const workspace = await getOrCreateWorkspace(db, userId);
+  const set: Record<string, unknown> = {};
+  if (input.projectId !== undefined) set.projectId = input.projectId;
+  if (input.title !== undefined) set.title = input.title;
+  if (input.description !== undefined) set.description = input.description;
+  if (input.severity !== undefined) set.severity = input.severity;
+  if (input.confidence !== undefined) set.confidence = input.confidence;
+  if (input.sourceRef !== undefined) set.sourceRef = input.sourceRef;
+  await db.update(insights).set(set).where(and(eq(insights.id, id), eq(insights.workspaceId, workspace.id)));
+  return (await db.select().from(insights).where(and(eq(insights.id, id), eq(insights.workspaceId, workspace.id))).limit(1))[0];
+}
+export async function deleteInsight(userId: number, id: number) {
+  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
+  const workspace = await getOrCreateWorkspace(db, userId);
+  await db.delete(insights).where(and(eq(insights.id, id), eq(insights.workspaceId, workspace.id)));
+  return { success: true };
+}
 
 export async function getAnalyticsForUser(userId: number) {
   const data = await getDashboardForUser(userId);

@@ -17,7 +17,7 @@ const authenticatedUser = {
   openId: "audit-user",
   email: "audit@example.com",
   name: "Audit User",
-  loginMethod: "manus",
+  loginMethod: "better-auth",
   role: "user" as const,
   createdAt: new Date(),
   updatedAt: new Date(),
