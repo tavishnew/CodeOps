@@ -9,6 +9,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleGithubCallback, handleGithubConnect } from "../githubService";
 import { ensureDemoAccount } from "./demo";
+import { ENV } from "./env";
+import { createCorsMiddleware } from "./cors";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -32,6 +34,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Cross-origin mode (CLIENT_ORIGIN set = SPA on Vercel, API on Render):
+  // answer preflights and set credentialed CORS headers before any handler.
+  // No-op in single-service mode (no CLIENT_ORIGIN), keeping that deploy
+  // exactly as it was — no CORS headers at all.
+  app.use(createCorsMiddleware(ENV.clientOrigins));
   // Better Auth must receive the raw request before JSON/urlencoded parsers.
   app.all("/api/auth/*", getBetterAuthHandler());
   // Configure body parser with larger size limit for file uploads

@@ -60,8 +60,9 @@ pnpm db:seed -- <userId>      # userId = the app `users` table row id
 
 This app is designed to run as **one Render web service** that serves the API,
 auth, and the built SPA from the same origin. Same-origin cookies mean Better
-Auth works with zero CORS or SameSite configuration. There is deliberately **no
-CORS middleware** in the server.
+Auth works with zero CORS or SameSite configuration. The server ships **no CORS
+middleware by default** — it only activates when `CLIENT_ORIGIN` is set (split
+mode).
 
 1. **Database** — Render has no managed MySQL. Provision one at PlanetScale,
    TiDB Cloud, Aiven, Railway, or run MySQL 8 on a VPS, then set `DATABASE_URL`
@@ -82,26 +83,51 @@ CORS middleware** in the server.
 
 `render.yaml` is included in the repo for the blueprint flow.
 
-## Alternative: split SPA (Vercel) from API (Render)
+## Split deployment: SPA on Vercel, API on Render
 
-Possible but **not recommended** for this app — it buys edge caching for a
-couple of hundred KB of static assets while costing real auth complexity:
+Fully supported (the previous guidance treated it as a hypothetical — it is now
+wired end to end), though it costs more than the single-service option: it needs
+credentialed CORS, cross-site cookies, and HTTPS on both hosts. Two modes exist;
+pick one and set the env vars consistently.
 
-- Serve the static `dist/public/` on Vercel, with `vercel.json` rewrites
-  proxying `/api/*` to the Render URL.
-- The server would need **CORS middleware** added for `/api/*` (it has none
-  today).
-- Better Auth cookies must survive the origin split: set `BETTER_AUTH_URL` to
-  the Vercel origin, add the Vercel origin to `BETTER_AUTH_TRUSTED_ORIGINS`, and
-  switch cookies to cross-site mode (`SameSite=None; Secure`), which also
-  requires HTTPS on both hosts and typically a custom domain.
-- There is no legacy custom cookie layer left in the repo to adjust — all auth
-  cookie behavior lives in Better Auth via `server/_core/betterAuth.ts`
-  (env-driven).
+**Mode A — direct API calls (recommended).** The SPA talks straight to the
+Render origin, cross-origin, with cookies. Set `VITE_API_URL` to the Render URL
+in the Vercel project's build environment (it is baked into the bundle at build
+time). On Render set `CLIENT_ORIGIN` to the Vercel origin. The server then:
+answers credentialed CORS for that origin, trusts it in Better Auth, and issues
+`SameSite=None; Secure` session cookies (all cookie behavior lives in Better
+Auth — `server/_core/betterAuth.ts`; there is no legacy custom cookie layer).
+The `vercel.json` rewrites are inert in this mode because the SPA never calls a
+relative `/api` path.
 
-If you do split, wire the env vars already present in `.env.example`
-(`BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`) and re-test sign-up and
-sign-in across origins before shipping.
+**Mode B — same-origin rewrite.** Leave `VITE_API_URL` unset and let
+`vercel.json` proxy `/api/:path*` (plus SPA fallback to `/index.html`) to the
+Render URL. From the browser's perspective everything is one origin, so no CORS
+is exercised; cookies still need to survive the proxy, so also set
+`CLIENT_ORIGIN` on Render. Replace the placeholder in `vercel.json` with your
+Render URL.
+
+**Vercel project settings** (both modes): the repo builds from its root
+(`package.json`, `vite.config.ts`, output `dist/public/` are all at the repo
+root), so set **Root Directory to `.`**, Framework Preset **Vite**, build
+command **`pnpm build`**, and Output Directory **`dist/public`**. Set
+`VITE_API_URL` (Mode A) in the Vercel environment.
+
+**Render settings** (both modes): set `DATABASE_URL`, `BETTER_AUTH_SECRET`,
+`BETTER_AUTH_URL` to the Render service URL, and `CLIENT_ORIGIN` to the Vercel
+origin. **GitHub OAuth:** the Authorization callback URL registered in the
+GitHub OAuth App must be the *Render* URL
+(`https://<api>.onrender.com/api/github/callback`) — the token exchange runs
+server-side there. The app's Homepage URL can be the Vercel URL. After connect,
+the callback redirects the browser back to `CLIENT_ORIGIN`, and the "Connect
+GitHub" button always targets the server origin (`githubStatus.connectUrl`),
+so the flow works identically in both modes.
+
+Re-test sign-up, sign-in, logout, and the GitHub connect round-trip across
+origins before shipping. Note: Google social sign-in, if ever enabled, redirects
+its OAuth callback to `BETTER_AUTH_URL` (the Render origin), so it would land on
+Render's own SPA copy rather than Vercel — email/password auth is the
+cross-origin-tested path.
 
 ## Environment variables
 
@@ -110,7 +136,9 @@ sign-in across origins before shipping.
 | `DATABASE_URL` | ✅ | MySQL connection string |
 | `BETTER_AUTH_SECRET` | ✅ | Signing secret (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | — | Public URL; set in production |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | — | Extra auth origins (split deployments) |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | — | Extra auth origins (split deployments; `CLIENT_ORIGIN` is trusted automatically) |
+| `CLIENT_ORIGIN` | — | SPA origin(s) — enables credentialed CORS, `SameSite=None` cookies, and client-origin redirects |
+| `VITE_API_URL` | — | **Client build env (Vercel)**: absolute API origin for direct cross-origin calls; unset = relative `/api` via the `vercel.json` rewrite |
 | `GITHUB_CLIENT_ID` / `_SECRET` / `_CALLBACK_URL` | — | Per-user GitHub OAuth App connect (see below) |
 | `GITHUB_TOKEN_ENCRYPTION_KEY` | — | AES key for encrypted GitHub token storage (defaults to a hash of `BETTER_AUTH_SECRET`) |
 | `DEMO_EMAIL` / `DEMO_PASSWORD` | — | Provision the labeled Demo account with seeded walkthrough data |
@@ -124,7 +152,9 @@ provider is added, keys would join this list.
 ### GitHub repository connection
 
 Each real account can connect its own GitHub account from **Settings → Connect
-GitHub** (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`).
+GitHub** (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`; in a
+split deployment the callback URL points at the Render server and redirects land
+back on `CLIENT_ORIGIN`).
 The flow is a standard OAuth2 authorize redirect with a signed state nonce
 (`/api/github/connect` → GitHub → `/api/github/callback`), requesting `repo` and
 `read:user` scopes (repo covers public + private repos; drop to `public_repo`

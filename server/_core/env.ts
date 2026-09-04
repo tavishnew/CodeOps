@@ -19,6 +19,15 @@ export const ENV = {
     url: process.env.BETTER_AUTH_URL || `http://localhost:${process.env.PORT || "3000"}`,
     trustedOrigins: list(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
   },
+  /**
+   * SPA origins allowed to call this API cross-origin (Vercel-split mode).
+   * Comma-separated. When set, the server: (1) answers CORS with credentials
+   * for these origins, (2) trusts them in Better Auth, (3) switches auth
+   * cookies to SameSite=None + Secure, and (4) points GitHub OAuth callback
+   * redirects back at the first origin in the list. Empty = single-service
+   * mode (same origin), where none of that applies.
+   */
+  clientOrigins: list(process.env.CLIENT_ORIGIN),
   github: {
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",

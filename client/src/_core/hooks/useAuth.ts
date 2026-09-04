@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiUrl } from "../../lib/api";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -27,7 +28,7 @@ export function useAuth(options?: UseAuthOptions) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/get-session", {
+      const response = await fetch(apiUrl("/api/auth/get-session"), {
         credentials: "include",
         headers: { Accept: "application/json" },
       });
@@ -53,7 +54,7 @@ export function useAuth(options?: UseAuthOptions) {
   const logout = useCallback(async () => {
     setLogoutPending(true);
     try {
-      const response = await fetch("/api/auth/sign-out", {
+      const response = await fetch(apiUrl("/api/auth/sign-out"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -23,7 +23,12 @@ services:
         sync: false # set in the Render dashboard (secret) — openssl rand -base64 32
       - key: BETTER_AUTH_URL
         sync: false # set to this service's URL, e.g. https://codeops.onrender.com
-      # Optional — only when SPA and API are split across origins (see README):
+      # Optional — only when the SPA is hosted separately (Vercel split, see
+      # README). CLIENT_ORIGIN enables credentialed CORS + SameSite=None
+      # cookies + trusted origins for the SPA origin(s); GitHub OAuth callback
+      # redirects then land back on the first origin in the list.
+      - key: CLIENT_ORIGIN
+        sync: false
       - key: BETTER_AUTH_TRUSTED_ORIGINS
         sync: false
       # Optional — social sign-in:

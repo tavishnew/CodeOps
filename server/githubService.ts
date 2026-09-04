@@ -26,6 +26,28 @@ export function isGithubConfigured(): boolean {
   return Boolean(ENV.github.clientId && ENV.github.clientSecret && ENV.github.callbackUrl);
 }
 
+/**
+ * Absolute URL that starts the OAuth flow. Always the server's own origin
+ * (BETTER_AUTH_URL — the Render URL in a split deployment), because the GitHub
+ * OAuth App callback is registered against that origin and the state-nonce
+ * cookie must round-trip on it. The SPA opens this URL regardless of where it
+ * is hosted, so the flow works in single-service, Vercel-rewrite, and
+ * direct-cross-origin modes alike.
+ */
+export function githubConnectUrl(): string {
+  return `${ENV.auth.url.replace(/\/+$/, "")}/api/github/connect`;
+}
+
+/**
+ * Post-OAuth redirect target for the browser. In split mode the user must land
+ * back on the SPA origin (CLIENT_ORIGIN); in single-service mode a relative
+ * path is correct (API and SPA share an origin).
+ */
+function appPath(path: string): string {
+  const clientOrigin = ENV.clientOrigins[0]?.replace(/\/+$/, "");
+  return clientOrigin ? `${clientOrigin}${path}` : path;
+}
+
 export function buildAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: ENV.github.clientId,
@@ -239,7 +261,7 @@ async function sessionUserFromRequest(req: Request) {
 
 export async function handleGithubConnect(_req: Request, res: Response) {
   if (!isGithubConfigured()) {
-    return res.redirect(`/dashboard/settings?github=unconfigured`);
+    return res.redirect(appPath(`/dashboard/settings?github=unconfigured`));
   }
   const state = randomBytes(24).toString("hex");
   res.cookie(GITHUB_STATE_COOKIE, state, {
@@ -256,12 +278,12 @@ export async function handleGithubCallback(req: Request, res: Response) {
   const { code, state, error } = req.query as Record<string, string | undefined>;
   const expectedState = stateCookieValue(req);
   res.clearCookie(GITHUB_STATE_COOKIE, { path: "/" });
-  if (error) return res.redirect(`/dashboard/settings?github=denied`);
-  if (!code || !state || state !== expectedState) return res.redirect(`/dashboard/settings?github=state_mismatch`);
-  if (!isGithubConfigured()) return res.redirect(`/dashboard/settings?github=unconfigured`);
+  if (error) return res.redirect(appPath(`/dashboard/settings?github=denied`));
+  if (!code || !state || state !== expectedState) return res.redirect(appPath(`/dashboard/settings?github=state_mismatch`));
+  if (!isGithubConfigured()) return res.redirect(appPath(`/dashboard/settings?github=unconfigured`));
 
   const githubUser = await sessionUserFromRequest(req);
-  if (!githubUser) return res.redirect(`/auth/sign-in?reason=github_connect`);
+  if (!githubUser) return res.redirect(appPath(`/auth/sign-in?reason=github_connect`));
 
   try {
     const { accessToken, scopes } = await githubToken(code);
@@ -272,8 +294,8 @@ export async function handleGithubCallback(req: Request, res: Response) {
     const openId = `better-auth:${githubUser.id}`;
     await upsertUser({ openId, name: githubUser.name, email: githubUser.email, loginMethod: "better-auth" });
     const appUser = (await getUserByOpenId(openId)) ?? null;
-    if (!appUser) return res.redirect(`/dashboard/settings?github=account_error`);
-    if (appUser.demo) return res.redirect(`/dashboard/settings?github=demo_blocked`);
+    if (!appUser) return res.redirect(appPath(`/dashboard/settings?github=account_error`));
+    if (appUser.demo) return res.redirect(appPath(`/dashboard/settings?github=demo_blocked`));
 
     await db
       .insert(githubConnections)
@@ -297,13 +319,13 @@ export async function handleGithubCallback(req: Request, res: Response) {
     // Initial population happens server-side right after connect.
     try {
       await syncUserGitHub(appUser.id);
-      return res.redirect(`/dashboard/settings?github=connected`);
+      return res.redirect(appPath(`/dashboard/settings?github=connected`));
     } catch (syncError) {
       console.error("[github] initial sync failed:", syncError);
-      return res.redirect(`/dashboard/settings?github=connected_sync_failed`);
+      return res.redirect(appPath(`/dashboard/settings?github=connected_sync_failed`));
     }
   } catch (error) {
     console.error("[github] callback failed:", error);
-    return res.redirect(`/dashboard/settings?github=error`);
+    return res.redirect(appPath(`/dashboard/settings?github=error`));
   }
 }

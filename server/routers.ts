@@ -4,7 +4,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import {
   archiveProject, createInsight, createIssue, createProject, deleteInsight, deleteIssue, deleteProject, getAnalyticsForUser, getAutomation, getDashboardForUser, getDeployment, getGithubIntegration, getIncident, getInsight, getIssue, getKnowledgeItem, getProject, getPullRequest, getWorkspaceForUser, listAutomations, listDeployments, listIncidents, listInsights, listIssues, listKnowledge, listProjects, listPullRequests, runAutomation, setAutomationEnabled, updateIncident, updateInsight, updateIssue, updateProject,
 } from "./db";
-import { disconnectUserGitHub, syncUserGitHub } from "./githubService";
+import { disconnectUserGitHub, githubConnectUrl, syncUserGitHub } from "./githubService";
 
 const idInput = z.object({ id: z.number().int().positive() });
 const projectInput = z.object({ name: z.string().trim().min(2).max(180), description: z.string().max(2000).optional(), repositoryUrl: z.string().url().optional() });
@@ -26,7 +26,7 @@ export const appRouter = router({
   knowledge: router({ list: protectedProcedure.query(({ ctx }) => listKnowledge(ctx.user.id)), get: detail(getKnowledgeItem, "Knowledge item") }),
   insights: router({ list: protectedProcedure.query(({ ctx }) => listInsights(ctx.user.id)), get: detail(getInsight, "Insight"), create: protectedProcedure.input(insightInput).mutation(({ ctx, input }) => createInsight(ctx.user.id, input)), update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: insightInput.partial() })).mutation(async ({ ctx, input }) => ensure(await updateInsight(ctx.user.id, input.id, input.data), "Insight")), delete: protectedProcedure.input(idInput).mutation(({ ctx, input }) => deleteInsight(ctx.user.id, input.id)) }),
   integrations: router({
-    githubStatus: protectedProcedure.query(({ ctx }) => getGithubIntegration(ctx.user.id)),
+    githubStatus: protectedProcedure.query(async ({ ctx }) => ({ ...(await getGithubIntegration(ctx.user.id)), connectUrl: githubConnectUrl() })),
     syncGithub: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.demo) throw new TRPCError({ code: "FORBIDDEN", message: "Demo accounts show seeded walkthrough data and cannot sync a GitHub account." });
       const result = await syncUserGitHub(ctx.user.id);
