@@ -2,8 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import {
-  archiveProject, connectGithubDemo, createInsight, createIssue, createProject, deleteInsight, deleteIssue, deleteProject, getAnalyticsForUser, getAutomation, getDashboardForUser, getDeployment, getGithubIntegration, getIncident, getInsight, getIssue, getKnowledgeItem, getProject, getPullRequest, getWorkspaceForUser, listAutomations, listDeployments, listGithubRepositories, listIncidents, listInsights, listIssues, listKnowledge, listProjects, listPullRequests, runAutomation, setAutomationEnabled, syncGithubDemo, updateIncident, updateInsight, updateIssue, updateProject,
+  archiveProject, createInsight, createIssue, createProject, deleteInsight, deleteIssue, deleteProject, getAnalyticsForUser, getAutomation, getDashboardForUser, getDeployment, getGithubIntegration, getIncident, getInsight, getIssue, getKnowledgeItem, getProject, getPullRequest, getWorkspaceForUser, listAutomations, listDeployments, listIncidents, listInsights, listIssues, listKnowledge, listProjects, listPullRequests, runAutomation, setAutomationEnabled, updateIncident, updateInsight, updateIssue, updateProject,
 } from "./db";
+import { disconnectUserGitHub, syncUserGitHub } from "./githubService";
 
 const idInput = z.object({ id: z.number().int().positive() });
 const projectInput = z.object({ name: z.string().trim().min(2).max(180), description: z.string().max(2000).optional(), repositoryUrl: z.string().url().optional() });
@@ -26,9 +27,18 @@ export const appRouter = router({
   insights: router({ list: protectedProcedure.query(({ ctx }) => listInsights(ctx.user.id)), get: detail(getInsight, "Insight"), create: protectedProcedure.input(insightInput).mutation(({ ctx, input }) => createInsight(ctx.user.id, input)), update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: insightInput.partial() })).mutation(async ({ ctx, input }) => ensure(await updateInsight(ctx.user.id, input.id, input.data), "Insight")), delete: protectedProcedure.input(idInput).mutation(({ ctx, input }) => deleteInsight(ctx.user.id, input.id)) }),
   integrations: router({
     githubStatus: protectedProcedure.query(({ ctx }) => getGithubIntegration(ctx.user.id)),
-    githubRepositories: protectedProcedure.query(({ ctx }) => listGithubRepositories(ctx.user.id)),
-    connectGithub: protectedProcedure.mutation(async ({ ctx }) => { const result = await connectGithubDemo(ctx.user.id); return { ...result, message: result.message }; }),
-    syncGithub: protectedProcedure.input(z.object({ repositoryNames: z.array(z.string().trim().min(1)).min(1).max(10) })).mutation(async ({ ctx, input }) => syncGithubDemo(ctx.user.id, input.repositoryNames)),
+    syncGithub: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.demo) throw new TRPCError({ code: "FORBIDDEN", message: "Demo accounts show seeded walkthrough data and cannot sync a GitHub account." });
+      const result = await syncUserGitHub(ctx.user.id);
+      return { ...result, message: "GitHub data refreshed — repositories, issues, and pull requests were pulled from your account." };
+    }),
+    disconnectGithub: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.demo) throw new TRPCError({ code: "FORBIDDEN", message: "Demo accounts have no GitHub connection to remove." });
+      return disconnectUserGitHub(ctx.user.id);
+    }),
+  }),
+  account: router({
+    me: protectedProcedure.query(({ ctx }) => ({ id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, demo: Boolean(ctx.user.demo) })),
   }),
 });
 

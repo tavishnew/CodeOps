@@ -55,10 +55,11 @@ export function getBetterAuth() {
         enabled: true,
         minPasswordLength: 8,
       },
+      // GitHub OAuth credentials are reserved for the per-user repository
+      // connect flow (server/githubService.ts). GitHub OAuth Apps accept a
+      // single callback URL, so GitHub social sign-in would need its own app
+      // and cannot share these credentials — it is intentionally not enabled.
       socialProviders: {
-        ...(ENV.github.clientId && ENV.github.clientSecret
-          ? { github: { clientId: ENV.github.clientId, clientSecret: ENV.github.clientSecret } }
-          : {}),
         ...(ENV.google.clientId && ENV.google.clientSecret
           ? { google: { clientId: ENV.google.clientId, clientSecret: ENV.google.clientSecret } }
           : {}),

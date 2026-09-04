@@ -31,21 +31,34 @@ describe("dashboard authorization boundary", () => {
   });
 });
 
-describe("integrations.github", () => {
-  it("keeps GitHub status, repository listing, connect, and sync procedures behind auth", async () => {
+describe("integrations.github and account", () => {
+  it("keeps GitHub status, sync, disconnect, and account procedures behind auth", async () => {
     const caller = appRouter.createCaller(createContext());
     await expect(caller.integrations.githubStatus()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.integrations.githubRepositories()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.integrations.connectGithub()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.integrations.syncGithub()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.integrations.disconnectGithub()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.account.me()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("routes GitHub actions through the real OAuth service, not a demo catalog", async () => {
     const source = await (await import("node:fs/promises")).readFile(new URL("./routers.ts", import.meta.url), "utf8");
-    expect(source).toContain("connectGithubDemo");
-    expect(source).toContain("syncGithubDemo");
-    expect(source).toContain("repositoryNames");
+    expect(source).toContain("syncUserGitHub");
+    expect(source).toContain("disconnectUserGitHub");
+    expect(source).not.toContain("connectGithubDemo");
+    expect(source).not.toContain("syncGithubDemo");
+    expect(source).not.toContain("githubRepositories");
     const dbSource = await (await import("node:fs/promises")).readFile(new URL("./db.ts", import.meta.url), "utf8");
+    expect(dbSource).toContain("githubConnections");
     expect(dbSource).toContain("githubLastSyncedAt");
-    expect(dbSource).toContain("selectDemoRepositories");
-    expect(dbSource).toContain("projects).where");
+    expect(dbSource).not.toContain("selectDemoRepositories");
+    expect(dbSource).not.toContain("listDemoRepositories");
+  });
+
+  it("blocks GitHub sync for the demo account at the router boundary", async () => {
+    const caller = appRouter.createCaller(createContext({ ...authenticatedUser, demo: 1 }));
+    await expect(caller.integrations.syncGithub()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.integrations.disconnectGithub()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.account.me()).resolves.toMatchObject({ demo: true });
   });
 });
 

@@ -7,6 +7,8 @@ import { getBetterAuthHandler } from "./betterAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleGithubCallback, handleGithubConnect } from "../githubService";
+import { ensureDemoAccount } from "./demo";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +37,9 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // GitHub OAuth connect + callback (per-user repository connection).
+  app.get("/api/github/connect", handleGithubConnect);
+  app.get("/api/github/callback", handleGithubCallback);
   // tRPC API
   app.use(
     "/api/trpc",
@@ -59,6 +64,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    ensureDemoAccount().catch(error => console.error("[demo] provisioning failed:", error));
   });
 }
 

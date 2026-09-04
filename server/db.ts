@@ -1,7 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, automations, automationRuns, deployments, incidents, insights, issues, knowledgeItems, projects, pullRequests, users, workspaces } from "../drizzle/schema";
-import { listDemoRepositories, demoSyncSummary, selectDemoRepositories } from "./githubDemo";
+import { InsertUser, automations, automationRuns, deployments, githubConnections, incidents, insights, issues, knowledgeItems, projects, pullRequests, users, workspaces } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { getOrCreateWorkspace } from "./seed";
 
@@ -74,45 +73,24 @@ export async function runAutomation(userId: number, id: number) { const db = awa
 export async function getGithubIntegration(userId: number) {
   const db = await getDb(); if (!db) throw new Error("Database is unavailable");
   const workspace = await getOrCreateWorkspace(db, userId);
+  // The github_connections row is the source of truth; workspace columns only
+  // keep the last-sync timestamp for display.
+  const [connection] = await db
+    .select({ githubUsername: githubConnections.githubUsername, scopes: githubConnections.scopes })
+    .from(githubConnections)
+    .where(eq(githubConnections.userId, userId))
+    .limit(1);
+  const [account] = await db.select({ demo: users.demo }).from(users).where(eq(users.id, userId)).limit(1);
+  const configured = Boolean(ENV.github.clientId && ENV.github.clientSecret && ENV.github.callbackUrl);
   return {
-    connected: Boolean(workspace.githubConnected),
-    provider: workspace.githubProvider ?? null,
-    accountLogin: workspace.githubAccountLogin ?? null,
+    connected: Boolean(connection),
+    provider: connection ? ("github" as const) : null,
+    accountLogin: connection?.githubUsername ?? null,
     lastSyncedAt: workspace.githubLastSyncedAt ?? null,
-    mode: workspace.githubProvider === "github-demo" ? "demo" as const : "unconfigured" as const,
+    scopes: connection?.scopes ?? null,
+    configured,
+    demo: Boolean(account?.demo),
   };
-}
-
-export async function listGithubRepositories(userId: number) {
-  const integration = await getGithubIntegration(userId);
-  return { integration, repositories: integration.connected ? listDemoRepositories() : [] };
-}
-
-export async function connectGithubDemo(userId: number) {
-  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
-  const workspace = await getOrCreateWorkspace(db, userId);
-  const repositories = listDemoRepositories();
-  const summary = demoSyncSummary(repositories);
-  await db.update(workspaces).set({ githubConnected: 1, githubProvider: summary.provider, githubAccountLogin: "codeops-demo", githubLastSyncedAt: summary.syncedAt }).where(eq(workspaces.id, workspace.id));
-  return { ...summary, connected: true, accountLogin: "codeops-demo", repositories };
-}
-
-export async function persistGithubSync(db: any, workspaceId: number, repositories: Array<{ name: string; url: string }>, syncedAt: Date) {
-  await db.update(workspaces).set({ githubConnected: 1, githubProvider: "github-demo", githubAccountLogin: "codeops-demo", githubLastSyncedAt: syncedAt }).where(eq(workspaces.id, workspaceId));
-  for (const repository of repositories) {
-    const projectName = repository.name === "autoqa" ? "AutoQA" : repository.name[0].toUpperCase() + repository.name.slice(1);
-    const existing = (await db.select({ id: projects.id }).from(projects).where(and(eq(projects.workspaceId, workspaceId), eq(projects.name, projectName))).limit(1))[0];
-    if (existing) await db.update(projects).set({ repositoryUrl: repository.url }).where(and(eq(projects.id, existing.id), eq(projects.workspaceId, workspaceId)));
-  }
-}
-
-export async function syncGithubDemo(userId: number, repositoryNames: string[]) {
-  const db = await getDb(); if (!db) throw new Error("Database is unavailable");
-  const workspace = await getOrCreateWorkspace(db, userId);
-  const repositories = selectDemoRepositories(repositoryNames);
-  const summary = demoSyncSummary(repositories);
-  await persistGithubSync(db, workspace.id, repositories, summary.syncedAt);
-  return { ...summary, connected: true, accountLogin: "codeops-demo", repositories };
 }
 
 export async function listProjects(userId: number) { const data = await getDashboardForUser(userId); return data.projects; }

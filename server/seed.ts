@@ -60,7 +60,7 @@ export async function getOrCreateWorkspace(db: Awaited<ReturnType<typeof getDb>>
   await db.insert(workspaces).values({ ownerId: userId, slug, name: ownerName ? `${ownerName}'s engineering` : "Engineering workspace", mode: "connected" });
   const [created] = await db.select().from(workspaces).where(eq(workspaces.ownerId, userId)).limit(1);
   if (!created) throw new Error("Workspace could not be created");
-  const freshWorkspace = created;
-  await seedWorkspace(db, freshWorkspace.id);
+  // Real sign-ups start empty. Seeding is reserved for the demo account
+  // (server/_core/demo.ts) and the manual `pnpm db:seed -- <userId>` CLI.
   return created;
 }

@@ -49,8 +49,8 @@ async function mockWorkspaceApi(page: Page) {
     const responses = paths.map(name => {
       if (name === "projects.list") return projects;
       if (name === "dashboard.overview") return { projects, issues: [], pullRequests: [], deployments: [], incidents: [], automations: [], knowledge: [] };
-      if (name === "integrations.githubStatus") return { connected: false, lastSyncedAt: null };
-      if (name === "integrations.githubRepositories") return { repositories: [] };
+      if (name === "integrations.githubStatus") return { connected: false, provider: null, accountLogin: null, lastSyncedAt: null, scopes: null, configured: true, demo: false };
+      if (name === "account.me") return { id: user.id, name: user.name, email: user.email, demo: false };
       if (name.startsWith("projects.")) return projects[0];
       return [];
     });

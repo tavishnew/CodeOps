@@ -27,11 +27,17 @@ pnpm dev                      # http://localhost:3000
 
 Generate a secret with `openssl rand -base64 32`.
 
-### Seeding
+### Seeding and the demo account
 
-New workspaces seed themselves automatically (projects, issues, PRs,
-deployments, incidents, automations, knowledge, insights) on first sign-in. To
-backfill an existing user's workspace:
+Real sign-ups start **empty** — no mock data. Their dashboard fills when they
+connect their own GitHub account (Settings → Connect GitHub) or add records
+manually. The seeded walkthrough data (Axiom, AutoQA, Notely, SignalDock,
+insights, …) belongs to exactly one account: the **Demo** account, provisioned
+at boot when `DEMO_EMAIL` + `DEMO_PASSWORD` are set. It shows a DEMO badge in
+the UI, and its GitHub connect button honestly explains that demo accounts
+can't connect a real account.
+
+To backfill a specific user's workspace manually:
 
 ```bash
 pnpm db:seed -- <userId>      # userId = the app `users` table row id
@@ -105,13 +111,33 @@ sign-in across origins before shipping.
 | `BETTER_AUTH_SECRET` | ✅ | Signing secret (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | — | Public URL; set in production |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | — | Extra auth origins (split deployments) |
-| `GITHUB_CLIENT_ID` / `_SECRET` | — | GitHub social sign-in |
+| `GITHUB_CLIENT_ID` / `_SECRET` / `_CALLBACK_URL` | — | Per-user GitHub OAuth App connect (see below) |
+| `GITHUB_TOKEN_ENCRYPTION_KEY` | — | AES key for encrypted GitHub token storage (defaults to a hash of `BETTER_AUTH_SECRET`) |
+| `DEMO_EMAIL` / `DEMO_PASSWORD` | — | Provision the labeled Demo account with seeded walkthrough data |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | — | Google social sign-in |
 | `PORT` | — | Server port (Render injects its own) |
 | `NODE_ENV` | — | `development` / `production` |
 
 No AI-provider keys exist yet — the AI surfaces are static UI copy. When a
 provider is added, keys would join this list.
+
+### GitHub repository connection
+
+Each real account can connect its own GitHub account from **Settings → Connect
+GitHub** (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`).
+The flow is a standard OAuth2 authorize redirect with a signed state nonce
+(`/api/github/connect` → GitHub → `/api/github/callback`), requesting `repo` and
+`read:user` scopes (repo covers public + private repos; drop to `public_repo`
+only if you never show private data). The access token is encrypted at rest
+(AES-256-GCM) in `github_connections`, tied to the user row — never plaintext.
+After connect, the server pulls repos + open issues/PRs and stores them as
+workspace rows (`source = 'github'`), so the dashboard reads its normal tables
+instead of hammering the GitHub API on every page load. "Sync now" re-pulls;
+"Disconnect GitHub" deletes the token and the GitHub-sourced rows.
+
+GitHub OAuth Apps accept a single callback URL, so this app cannot double as a
+GitHub **social sign-in** provider — the same credentials are intentionally not
+registered in Better Auth (email/password and Google sign-in remain available).
 
 ## Testing
 

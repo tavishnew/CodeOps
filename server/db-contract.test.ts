@@ -39,6 +39,10 @@ vi.mock("./db", () => ({
   createInsight: vi.fn(async (userId: number, input: { title: string }) => ({ id: 11, workspaceId: userId, title: input.title })),
   updateInsight: vi.fn(async (_userId: number, id: number) => ({ id, workspaceId: 7, title: "Elevated deployment risk updated" })),
   deleteInsight: vi.fn(async () => ({ success: true })),
+  getGithubIntegration: vi.fn(async () => ({ connected: false, provider: null, accountLogin: null, lastSyncedAt: null, scopes: null, configured: false, demo: false })),
+  getDb: vi.fn(async () => undefined),
+  getUserByOpenId: vi.fn(async () => undefined),
+  upsertUser: vi.fn(async () => undefined),
 }));
 
 const user = { id: 42, openId: "contract-user", email: "contract@example.com", name: "Contract User", loginMethod: "better-auth", role: "user" as const, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };

@@ -53,6 +53,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  demo: int("demo").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -78,6 +79,7 @@ export const projects = mysqlTable("projects", {
   name: varchar("name", { length: 180 }).notNull(),
   description: text("description"),
   repositoryUrl: varchar("repositoryUrl", { length: 500 }),
+  source: varchar("source", { length: 20 }).default("manual").notNull(),
   status: mysqlEnum("status", ["on_track", "watch", "at_risk"]).default("on_track").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -89,6 +91,7 @@ export const issues = mysqlTable("issues", {
   projectId: int("projectId").notNull(),
   key: varchar("key", { length: 40 }).notNull(),
   title: varchar("title", { length: 240 }).notNull(),
+  source: varchar("source", { length: 20 }).default("manual").notNull(),
   description: text("description"),
   status: mysqlEnum("status", ["open", "in_progress", "closed"]).default("open").notNull(),
   priority: mysqlEnum("priority", ["low", "medium", "high"]).default("medium").notNull(),
@@ -102,6 +105,7 @@ export const pullRequests = mysqlTable("pull_requests", {
   projectId: int("projectId").notNull(),
   number: int("number").notNull(),
   title: varchar("title", { length: 240 }).notNull(),
+  source: varchar("source", { length: 20 }).default("manual").notNull(),
   status: mysqlEnum("status", ["open", "merged", "closed"]).default("open").notNull(),
   risk: mysqlEnum("risk", ["low", "medium", "high"]).default("medium").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -164,6 +168,16 @@ export const knowledgeItems = mysqlTable("knowledge_items", {
   sourceRef: varchar("sourceRef", { length: 500 }),
   content: text("content"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const githubConnections = mysqlTable("github_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  accessTokenEnc: text("accessTokenEnc").notNull(),
+  githubUsername: varchar("githubUsername", { length: 180 }).notNull(),
+  scopes: varchar("scopes", { length: 500 }),
+  connectedAt: timestamp("connectedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export const insights = mysqlTable("insights", {

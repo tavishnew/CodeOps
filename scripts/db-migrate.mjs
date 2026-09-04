@@ -13,6 +13,8 @@ const FILES = [
   "alter_user_email.sql",
   "create_auth_tables.sql",
   "add_github_integration.sql",
+  "create_github_connections.sql",
+  "alter_github_columns.sql",
 ];
 
 const drizzleDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
